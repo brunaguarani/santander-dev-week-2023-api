@@ -1,0 +1,47 @@
+import gspread
+from google.oauth2.service_account import Credentials
+import pandas as pd
+
+# Configurar credenciais
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+SERVICE_ACCOUNT_FILE = "caminho/para/seu/arquivo-credenciais.json"
+
+# Autenticação
+credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+client = gspread.authorize(credentials)
+
+# Abrir a planilha pelo link
+spreadsheet_url = "https://docs.google.com/spreadsheets/d/1Ys4iCCm6fYdj9yVChn2fNqlf3R42-H5XCoqyzqUJMUY/edit?gid=130670703"
+sheet = client.open_by_url(spreadsheet_url).sheet1
+
+# Ler os dados da planilha
+data = sheet.get_all_records()
+df = pd.DataFrame(data)
+
+# Transformar os dados
+# 1. Conversão de datas
+if 'Data' in df.columns:
+    df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+
+# 2. Filtrar valores nulos ou inconsistentes
+df = df.dropna()
+
+# 3. Categorização adicional (exemplo: qualidade do ar)
+if 'Qualidade do Ar' in df.columns:
+    def categorizar_qualidade(valor):
+        if valor <= 50:
+            return 'Bom'
+        elif valor <= 100:
+            return 'Moderado'
+        elif valor <= 150:
+            return 'Ruim'
+        else:
+            return 'Muito Ruim'
+
+    df['Categoria Qualidade'] = df['Qualidade do Ar'].apply(categorizar_qualidade)
+
+# Atualizar a planilha com os dados transformados
+sheet.clear()  # Limpar os dados antigos
+sheet.update([df.columns.values.tolist()] + df.values.tolist())
+
+print("Planilha atualizada com sucesso!")
